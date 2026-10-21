@@ -1,37 +1,33 @@
-// Le modèle se teste sans navigateur : il ne dépend pas du DOM.
+// Le ViewModel se teste sans navigateur : il ne touche jamais au DOM.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TodoModel } from './TodoModel.js';
+import { TodoViewModel } from './TodoViewModel.js';
 
-test('ajouter une tâche notifie les abonnés', () => {
-  const model = new TodoModel();
-  const snapshots = [];
-  model.subscribe(todos => snapshots.push(todos));
-  model.add('Lire le cours');
-  assert.equal(snapshots.length, 2); // état initial + après ajout
-  assert.equal(snapshots[1][0].title, 'Lire le cours');
+test('ajouter met à jour visibles et restantes', () => {
+  const vm = new TodoViewModel();
+  vm.ajouter('A');
+  assert.equal(vm.visibles.get().length, 1);
+  assert.equal(vm.restantes.get(), 1);
 });
 
-test('un titre vide est refusé', () => {
-  assert.throws(() => new TodoModel().add('   '), /obligatoire/);
+test('un titre vide remplit erreur, puis une saisie valide l’efface', () => {
+  const vm = new TodoViewModel();
+  vm.ajouter('  ');
+  assert.match(vm.erreur.get(), /obligatoire/);
+  vm.ajouter('A');
+  assert.equal(vm.erreur.get(), '');
 });
 
-test('toggle inverse l’état done', () => {
-  const model = new TodoModel();
-  model.add('A');
-  const [a] = model.all();
-  model.toggle(a.id);
-  assert.equal(model.all()[0].done, true);
+test('le filtre « faites » ne montre que les tâches cochées', () => {
+  const vm = new TodoViewModel();
+  vm.ajouter('A');
+  vm.ajouter('B');
+  vm.basculer(vm.visibles.get()[0].id);
+  vm.changerFiltre('faites');
+  assert.deepEqual(vm.visibles.get().map(t => t.title), ['A']);
+  assert.equal(vm.restantes.get(), 1);
 });
 
-test('filtrer « faites » ne garde que les tâches cochées', () => {
-  const m = new TodoModel();
-  m.add('A'); m.add('B');
-  m.toggle(m.all()[0].id);
-  assert.deepEqual(m.filtrer('faites').map(t => t.title), ['A']);
-  assert.equal(m.restantes(), 1);
-});
-
-test('un nom de filtre inconnu lève une erreur', () => {
-  assert.throws(() => new TodoModel().filtrer('nimporte'), /inconnu/);
+test('un filtre inconnu est refusé', () => {
+  assert.throws(() => new TodoViewModel().changerFiltre('xyz'), /inconnu/);
 });
